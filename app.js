@@ -19,6 +19,9 @@ const fallbackServices = [
 let clients = fallbackClients;
 let barbers = fallbackBarbers;
 let services = fallbackServices;
+let appointments = [];
+let reviews = [];
+let reviewableAppointments = [];
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -33,6 +36,22 @@ async function apiGet(resource) {
   }
   const response = await fetch(`${API_URL}?resource=${resource}`, { headers });
   if (!response.ok) throw new Error("API unavailable");
+  return response.json();
+}
+
+async function apiGetReviews(rating = "") {
+  const query = rating
+    ? `&puntuacion=${encodeURIComponent(rating)}`
+    : "";
+
+  const response = await fetch(
+    `${API_URL}?resource=reviews${query}`
+  );
+
+  if (!response.ok) {
+    throw new Error("No se pudieron cargar las reseñas");
+  }
+
   return response.json();
 }
 
@@ -51,6 +70,14 @@ async function apiPost(resource, payload) {
 }
 
 function renderAppointments(appointments = []) {
+  window.completedAppointments = appointments.filter((item) => item.estado === "Completado" && item.id_turno);
+  const rows = appointments.length ? appointments : [
+    { hora: "09:00", cliente: "Alejandro Torres", servicio: "Corte clasico", barbero: "Marco Ruiz", estado: "Pendiente" },
+    { hora: "10:30", cliente: "Pablo Sanchez", servicio: "Fade + barba", barbero: "Sofia Martin", estado: "Completado" },
+    { hora: "12:00", cliente: "Javier Moreno", servicio: "Arreglo de barba", barbero: "Diego Navarro", estado: "Pendiente" }
+  ];
+  $("#today-timeline").innerHTML = rows.map((item, index) => `
+    <div class="appointment"><div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
   const container = $("#today-timeline");
   
   if (!appointments || appointments.length === 0) {
@@ -70,9 +97,62 @@ function renderAppointments(appointments = []) {
           <small>${item.servicio || ''} &middot; ${item.barbero || ''}</small>
         </div>
         <span class="appointment-status">${item.estado}</span>
+        ${item.estado === "Completado" && item.id_turno ? `<button class="text-button review-appointment" data-review-turno="${item.id_turno}">Valorar</button>` : ""}
       </div>
     </div>`;
   }).join("");
+}
+
+function renderReviews(result = { data: [], summary: [] }) {
+  reviews = result.data || [];
+  reviewableAppointments = result.pending || [];
+
+  $("#review-summary").innerHTML =
+    (result.summary || []).map((item) => `
+      <article class="stat-card">
+        <div class="stat-top">
+          <span>${item.nombre}</span>
+          <span class="stat-icon purple">&#9733;</span>
+        </div>
+
+        <div class="stat-value">
+          ${Number(item.nota_media || 0).toFixed(2)}
+          <span class="unit">/10</span>
+        </div>
+
+        <div class="stat-foot neutral">
+          ${item.total_resenas} reseña(s)
+        </div>
+      </article>
+    `).join("");
+
+  $("#reviews-table").innerHTML =
+    reviews.map((review) => `
+      <tr>
+        <td>${review.cliente}</td>
+        <td>${review.barbero}</td>
+        <td>${review.servicio}</td>
+        <td><strong>${review.puntuacion}/10</strong></td>
+        <td>${review.comentario || "-"}</td>
+        <td>
+          ${new Date(review.fecha_creacion)
+            .toLocaleDateString("es-ES")}
+        </td>
+      </tr>
+    `).join("");
+}
+
+function populateReviewForm() {
+  const completed = reviewableAppointments.length ? reviewableAppointments : (window.completedAppointments || []);
+  $("#review-appointment").innerHTML = completed.length
+    ? completed.map((item) => `<option value="${item.id_turno}">${item.cliente} - ${item.servicio} (${item.hora || item.fecha_hora})</option>`).join("")
+    : '<option value="">No hay turnos completados disponibles</option>';
+}
+
+function openReviewModal(turnoId = "") {
+  populateReviewForm();
+  if (turnoId) $("#review-appointment").value = turnoId;
+  $("#review-modal-backdrop").classList.add("open");
 }
 
 function clientRow(client, detailed = false) {
@@ -217,21 +297,26 @@ function setupClientAutocomplete() {
 
 async function loadData() {
   try {
-    const [clientResponse, barberResponse, serviceResponse, dashboardResponse] = await Promise.all([
-      apiGet("clients"), apiGet("barbers"), apiGet("services"), apiGet("dashboard")
+    const [clientResponse, barberResponse, serviceResponse, dashboardResponse, reviewResponse] = await Promise.all([
+      apiGet("clients"), apiGet("barbers"), apiGet("services"), apiGet("dashboard"), apiGetReviews()
     ]);
     clients = clientResponse.data;
     barbers = barberResponse.data;
     services = serviceResponse.data;
-    renderAppointments(dashboardResponse.appointments);
+    appointments = dashboardResponse.appointments || [];
+    renderAppointments(appointments);
     renderClients();
     renderBarbers();
     renderServices();
+    populateAppointmentForm();
+    renderReviews(reviewResponse);
   } catch {
     renderAppointments();
     renderClients();
     renderBarbers();
     renderServices();
+    populateAppointmentForm();
+    renderReviews();
     notify("Modo demo: inicia Apache y MySQL para conectar phpMyAdmin.");
   }
 }
@@ -263,6 +348,23 @@ function notify(message) { $("#toast-text").textContent = message; $("#toast").c
 
 $$(".nav-item").forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
 $$("[data-view-link]").forEach((item) => item.addEventListener("click", () => showView(item.dataset.viewLink)));
+$("#new-appointment").addEventListener("click", () => openModal());
+$("#agenda-new").addEventListener("click", () => openModal());
+$("#clients-new").addEventListener("click", () => openModal("Nuevo cliente"));
+$("#quick-client").addEventListener("click", () => openModal("Nuevo cliente"));
+$("#quick-service").addEventListener("click", () => openModal("Nuevo servicio"));
+$("#new-review").addEventListener("click", () => openReviewModal());
+$("#review-modal-close").addEventListener("click", () => $("#review-modal-backdrop").classList.remove("open"));
+$("#review-modal-backdrop").addEventListener("click", (event) => {
+  if (event.target === $("#review-modal-backdrop")) $("#review-modal-backdrop").classList.remove("open");
+});
+$("#review-rating-filter").addEventListener("change", async (event) => {
+  try { renderReviews(await apiGetReviews(event.target.value)); } catch (error) { notify(error.message); }
+});
+$("#today-timeline").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-review-turno]");
+  if (button) openReviewModal(button.dataset.reviewTurno);
+});
 
 // ----------------------------------------------------
 // NUEVO: Conectar botones con sus respectivos modals
@@ -339,10 +441,36 @@ $("#client-search").addEventListener("input", (event) => {
 });
 $(".mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
 
+$("#review-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const form = new FormData(event.target);
+
+  try {
+    await apiPost("reviews", {
+      id_turno: form.get("id_turno"),
+      puntuacion: form.get("puntuacion"),
+      comentario: form.get("comentario")
+    });
+
+    $("#review-modal-backdrop").classList.remove("open");
+    event.target.reset();
+
+    notify("Reseña guardada correctamente.");
+
+    renderReviews(
+      await apiGetReviews($("#review-rating-filter").value)
+    );
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
 renderAppointments();
 renderClients();
 renderBarbers();
 renderServices();
+renderReviews();
 loadData();
 
 // ====================================================

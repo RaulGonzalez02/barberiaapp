@@ -5,7 +5,7 @@ require_once __DIR__ . '/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-User-Id, X-User-Role');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -26,6 +26,14 @@ function respond(array $data, int $status = 200): never
     exit;
 }
 
+function currentUser(): array
+{
+    return [
+        'id' => filter_var($_SERVER['HTTP_X_USER_ID'] ?? null, FILTER_VALIDATE_INT) ?: null,
+        'role' => $_SERVER['HTTP_X_USER_ROLE'] ?? null,
+    ];
+}
+
 try {
     $pdo = database();
     $resource = $_GET['resource'] ?? 'dashboard';
@@ -34,6 +42,26 @@ try {
         switch ($resource) {
 case 'dashboard':
                 $today = date('Y-m-d');
+                $appointments = $pdo->prepare(
+                    "SELECT t.id_turno, t.id_cliente, t.id_barbero, DATE_FORMAT(t.fecha_hora, '%H:%i') AS hora,
+                            c.nombre AS cliente, s.nombre AS servicio, b.nombre AS barbero,
+                            t.estado, s.duracion, t.precio_cobrado
+                     FROM turnos t
+                     INNER JOIN clientes c ON c.id_cliente = t.id_cliente
+                     INNER JOIN servicios s ON s.id_servicio = t.id_servicio
+                     INNER JOIN barberos b ON b.id_barbero = t.id_barbero
+                     WHERE DATE(t.fecha_hora) = ? AND t.estado <> 'Cancelado'
+                     ORDER BY t.fecha_hora"
+                );
+                $appointments->execute([$today]);
+                $stats = $pdo->prepare(
+                    "SELECT COUNT(*) AS turnos_hoy,
+                            COALESCE(SUM(CASE WHEN estado = 'Completado' THEN precio_cobrado ELSE 0 END), 0) AS ingresos_hoy,
+                            (SELECT COUNT(*) FROM clientes WHERE DATE(fecha_registro) = ?) AS nuevos_clientes
+                     FROM turnos WHERE DATE(fecha_hora) = ? AND estado <> 'Cancelado'"
+                );
+                $stats->execute([$today, $today]);
+                respond(['appointments' => $appointments->fetchAll(), 'stats' => $stats->fetch()]);
                 $userId = $_SERVER['HTTP_X_USER_ID'] ?? null;
                 $userRole = $_SERVER['HTTP_X_USER_ROLE'] ?? null;
                 
@@ -110,6 +138,65 @@ case 'dashboard':
             case 'settings':
                 $stmt = $pdo->query("SELECT clave, valor, descripcion FROM configuracion ORDER BY clave");
                 respond(['data' => $stmt->fetchAll()]);
+
+            case 'reviews':
+                $user = currentUser();
+                $where = [];
+                $params = [];
+                if ($user['role'] === 'cliente') {
+                    if (!$user['id']) {
+                        respond(['error' => 'La sesión del cliente no es válida'], 401);
+                    }
+                    $where[] = 'r.id_cliente = ?';
+                    $params[] = $user['id'];
+                } elseif (!empty($_GET['id_barbero'])) {
+                    $where[] = 'r.id_barbero = ?';
+                    $params[] = (int) $_GET['id_barbero'];
+                }
+                if (!empty($_GET['puntuacion'])) {
+                    $where[] = 'r.puntuacion = ?';
+                    $params[] = (int) $_GET['puntuacion'];
+                }
+                $filter = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+                $stmt = $pdo->prepare(
+                    "SELECT r.id_resena, r.id_turno, r.id_cliente, r.id_barbero, r.puntuacion,
+                            r.comentario, r.fecha_creacion, c.nombre AS cliente,
+                            b.nombre AS barbero, s.nombre AS servicio
+                     FROM resenas r
+                     INNER JOIN clientes c ON c.id_cliente = r.id_cliente
+                     INNER JOIN barberos b ON b.id_barbero = r.id_barbero
+                     INNER JOIN turnos t ON t.id_turno = r.id_turno
+                     INNER JOIN servicios s ON s.id_servicio = t.id_servicio
+                     {$filter}
+                     ORDER BY r.fecha_creacion DESC"
+                );
+                $stmt->execute($params);
+                $summary = $pdo->query(
+                    "SELECT b.id_barbero, b.nombre, COUNT(r.id_resena) AS total_resenas,
+                            COALESCE(ROUND(AVG(r.puntuacion), 2), 0) AS nota_media
+                     FROM barberos b
+                     LEFT JOIN resenas r ON r.id_barbero = b.id_barbero
+                     GROUP BY b.id_barbero, b.nombre
+                     ORDER BY nota_media DESC, b.nombre"
+                );
+                $pendingWhere = $user['role'] === 'cliente' ? 'AND t.id_cliente = ?' : '';
+                $pendingParams = $user['role'] === 'cliente' ? [$user['id']] : [];
+                $pending = $pdo->prepare(
+                    "SELECT t.id_turno, t.id_cliente, c.nombre AS cliente, s.nombre AS servicio,
+                            DATE_FORMAT(t.fecha_hora, '%d/%m/%Y %H:%i') AS fecha_hora
+                     FROM turnos t
+                     INNER JOIN clientes c ON c.id_cliente = t.id_cliente
+                     INNER JOIN servicios s ON s.id_servicio = t.id_servicio
+                     WHERE t.estado = 'Completado' {$pendingWhere}
+                       AND NOT EXISTS (SELECT 1 FROM resenas r WHERE r.id_turno = t.id_turno)
+                     ORDER BY t.fecha_hora DESC"
+                );
+                $pending->execute($pendingParams);
+                respond([
+                    'data' => $stmt->fetchAll(),
+                    'summary' => $summary->fetchAll(),
+                    'pending' => $pending->fetchAll(),
+                ]);
 
             default:
                 respond(['error' => 'Recurso no encontrado'], 404);
@@ -211,6 +298,55 @@ if ($resource === 'appointments') {
             respond(['clave' => $data['clave']], 200);
         }
 
+        if ($resource === 'reviews') {
+            foreach (['id_turno', 'puntuacion'] as $required) {
+                if (!isset($data[$required]) || $data[$required] === '') {
+                    respond(['error' => "Falta el campo {$required}"], 422);
+                }
+            }
+            $rating = filter_var($data['puntuacion'], FILTER_VALIDATE_INT);
+            if ($rating === false || $rating < 1 || $rating > 10) {
+                respond([
+                    'error' => 'La puntuación debe estar entre 1 y 10'
+                ], 422);
+            }
+            $user = currentUser();
+            $turno = $pdo->prepare(
+                "SELECT id_turno, id_cliente, id_barbero
+                FROM turnos
+                WHERE id_turno = ?
+                AND estado = 'Completado'"
+            );
+            $turno->execute([(int) $data['id_turno']]);
+            $appointment = $turno->fetch();
+            if (!$appointment) {
+                respond(['error' => 'Solo puedes reseñar turnos completados'], 422);
+            }
+            if ($user['role'] === 'cliente' && (!$user['id'] || (int) $user['id'] !== (int) $appointment['id_cliente'])) {
+                respond(['error' => 'No puedes reseñar este turno'], 403);
+            }
+            $existing = $pdo->prepare(
+                "SELECT id_resena FROM resenas WHERE id_turno = ?"
+            );
+            $existing->execute([$appointment['id_turno']]);
+
+            if ($existing->fetch()) {
+                respond([
+                    'error' => 'Este turno ya tiene una reseña'
+                ], 409);
+            }
+            $stmt = $pdo->prepare(
+                "INSERT INTO resenas (id_turno, id_cliente, id_barbero, puntuacion, comentario)
+                 VALUES (?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([
+                $appointment['id_turno'],
+                $appointment['id_cliente'],
+                $appointment['id_barbero'],
+                $rating,
+                trim((string) ($data['comentario'] ?? '')) ?: null,
+            ]);
+            respond(['id_resena' => (int) $pdo->lastInsertId()], 201);
         if ($resource === 'login') {
             if (empty($data['email']) || empty($data['password'])) {
                 respond(['error' => 'Email y contraseña son obligatorios'], 422);
