@@ -32,28 +32,51 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         switch ($resource) {
-            case 'dashboard':
+case 'dashboard':
                 $today = date('Y-m-d');
-                $appointments = $pdo->prepare(
-                    "SELECT t.id_turno, DATE_FORMAT(t.fecha_hora, '%H:%i') AS hora,
-                            c.nombre AS cliente, s.nombre AS servicio, b.nombre AS barbero,
-                            t.estado, s.duracion, t.precio_cobrado
-                     FROM turnos t
-                     INNER JOIN clientes c ON c.id_cliente = t.id_cliente
-                     INNER JOIN servicios s ON s.id_servicio = t.id_servicio
-                     INNER JOIN barberos b ON b.id_barbero = t.id_barbero
-                     WHERE DATE(t.fecha_hora) = ? AND t.estado <> 'Cancelado'
-                     ORDER BY t.fecha_hora"
-                );
-                $appointments->execute([$today]);
-                $stats = $pdo->prepare(
-                    "SELECT COUNT(*) AS turnos_hoy,
-                            COALESCE(SUM(CASE WHEN estado = 'Completado' THEN precio_cobrado ELSE 0 END), 0) AS ingresos_hoy,
-                            (SELECT COUNT(*) FROM clientes WHERE DATE(fecha_registro) = ?) AS nuevos_clientes
-                     FROM turnos WHERE DATE(fecha_hora) = ? AND estado <> 'Cancelado'"
-                );
-                $stats->execute([$today, $today]);
-                respond(['appointments' => $appointments->fetchAll(), 'stats' => $stats->fetch()]);
+                $userId = $_SERVER['HTTP_X_USER_ID'] ?? null;
+                $userRole = $_SERVER['HTTP_X_USER_ROLE'] ?? null;
+                
+                // Si es CLIENTE, solo ve sus propios turnos futuros (no los de hoy del local)
+                if ($userRole === 'cliente') {
+                    $appointments = $pdo->prepare("
+                        SELECT t.id_turno, DATE_FORMAT(t.fecha_hora, '%d/%m %H:%i') AS hora,
+                               s.nombre AS servicio, b.nombre AS barbero, t.estado
+                        FROM turnos t
+                        INNER JOIN servicios s ON s.id_servicio = t.id_servicio
+                        INNER JOIN barberos b ON b.id_barbero = t.id_barbero
+                        WHERE t.id_cliente = ? AND t.fecha_hora >= CURRENT_TIMESTAMP AND t.estado <> 'Cancelado'
+                        ORDER BY t.fecha_hora ASC
+                    ");
+                    $appointments->execute([(int)$userId]);
+                    
+                    respond(['appointments' => $appointments->fetchAll(), 'stats' => null]);
+                } 
+                // Si es ADMIN o BARBERO, ven toda la agenda del día
+                else {
+                    $appointments = $pdo->prepare("
+                        SELECT t.id_turno, DATE_FORMAT(t.fecha_hora, '%H:%i') AS hora,
+                               c.nombre AS cliente, s.nombre AS servicio, b.nombre AS barbero,
+                               t.estado, s.duracion, t.precio_cobrado
+                        FROM turnos t
+                        INNER JOIN clientes c ON c.id_cliente = t.id_cliente
+                        INNER JOIN servicios s ON s.id_servicio = t.id_servicio
+                        INNER JOIN barberos b ON b.id_barbero = t.id_barbero
+                        WHERE DATE(t.fecha_hora) = ? AND t.estado <> 'Cancelado'
+                        ORDER BY t.fecha_hora ASC
+                    ");
+                    $appointments->execute([$today]);
+                    
+                    $stats = $pdo->prepare("
+                        SELECT COUNT(*) AS turnos_hoy,
+                               COALESCE(SUM(CASE WHEN estado = 'Completado' THEN precio_cobrado ELSE 0 END), 0) AS ingresos_hoy,
+                               (SELECT COUNT(*) FROM clientes WHERE DATE(fecha_registro) = ?) AS nuevos_clientes
+                        FROM turnos WHERE DATE(fecha_hora) = ? AND estado <> 'Cancelado'
+                    ");
+                    $stats->execute([$today, $today]);
+                    
+                    respond(['appointments' => $appointments->fetchAll(), 'stats' => $stats->fetch()]);
+                }
 
             case 'clients':
                 $stmt = $pdo->query(
