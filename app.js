@@ -261,6 +261,9 @@ $("#modal-backdrop").addEventListener("click", (event) => { if (event.target ===
 // ----------------------------------------------------
 // NUEVO: Procesamiento dinámico del form (submit)
 // ----------------------------------------------------
+// ----------------------------------------------------
+// NUEVO: Procesamiento dinámico del form (submit)
+// ----------------------------------------------------
 $("#modal-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
@@ -269,27 +272,33 @@ $("#modal-form").addEventListener("submit", async (event) => {
   try {
     let payload = {};
     
-if (actionType === "appointments") {
+    // Construimos los datos según el formulario que esté abierto
+    if (actionType === "appointments") {
       const idCliente = form.get("id_cliente");
-      
-      // Añade esta comprobación:
       if (!idCliente) {
         notify("Por favor, selecciona un cliente válido de la lista.");
-        return; // Detiene el envío
+        return; 
       }
-
       payload = {
         id_cliente: idCliente, 
         id_barbero: form.get("id_barbero"), 
         id_servicio: form.get("id_servicio"),
         fecha_hora: `${form.get("date")} ${form.get("time")}:00`
       };
+    } 
+    else if (actionType === "barbers") {
+      payload = { nombre: form.get("nombre"), especialidad: form.get("especialidad") };
+    } 
+    else if (actionType === "clients") {
+      payload = { nombre: form.get("nombre"), telefono: form.get("telefono"), notas: form.get("notas") };
+    } 
+    else if (actionType === "services") {
+      payload = { nombre: form.get("nombre"), duracion: form.get("duracion"), precio: form.get("precio") };
     }
 
     await apiPost(actionType, payload);
     closeModal(); 
     
-    // Mensaje de éxito dinámico
     const successMessages = {
       appointments: "Turno guardado",
       barbers: "Barbero añadido",
@@ -298,7 +307,7 @@ if (actionType === "appointments") {
     };
     notify(`${successMessages[actionType]} correctamente.`); 
     
-    await loadData(); // Refresca las vistas con el nuevo dato
+    await loadData(); // Refresca las vistas
   } catch (error) { 
     notify(error.message); 
   }
@@ -315,3 +324,146 @@ renderClients();
 renderBarbers();
 renderServices();
 loadData();
+
+// ====================================================
+// AUTENTICACIÓN Y ROLES (Login, Permisos, Logout)
+// ====================================================
+
+let currentUser = null;
+const loginScreen = $("#login-screen");
+const appShell = $("#app-shell");
+const loginForm = $("#login-form");
+
+// 1. Inicializar la app: comprobar si ya hay sesión guardada
+function checkAuth() {
+  const storedUser = localStorage.getItem("barberly_user");
+  if (storedUser) {
+    currentUser = JSON.parse(storedUser);
+    showAppShell();
+  } else {
+    loginScreen.style.display = "flex";
+    appShell.style.display = "none";
+  }
+}
+
+// 2. Mostrar la interfaz principal y aplicar restricciones
+function showAppShell() {
+  loginScreen.style.display = "none";
+  appShell.style.display = "flex";
+  
+  applyRolePermissions();
+  
+  // Redirigir según el rol
+  if (currentUser.rol === 'cliente') {
+    showView('agenda'); // El cliente no tiene dashboard, va directo a sus citas
+  } else {
+    showView('dashboard');
+  }
+}
+
+// 3. Modificar el DOM (menú) según quién entra
+function applyRolePermissions() {
+  const role = currentUser.rol;
+  
+  // 1. Actualizar avatares (Protegido por si los elementos no existen en el HTML)
+  const userAvatar = $(".user-avatar");
+  if (userAvatar) userAvatar.textContent = initials(currentUser.nombre);
+  
+  const userStrong = $(".user-card strong");
+  if (userStrong) userStrong.textContent = currentUser.nombre;
+  
+  const userSmall = $(".user-card small");
+  if (userSmall) userSmall.textContent = role === 'admin' ? 'Administrador' : (role === 'barbero' ? 'Barbero' : 'Cliente');
+
+  // 2. Restablecer visibilidad de todos los botones por si hubo un cambio de cuenta
+  $$(".nav-item").forEach(btn => btn.style.display = "flex");
+  $$(".nav-label").forEach(label => label.style.display = "block");
+  const quickPanel = $(".quick-panel");
+  if (quickPanel) quickPanel.style.display = "block";
+
+  // 3. Aplicar restricciones según el rol
+  if (role === 'cliente') {
+    // Modo Cliente: Ocultar casi todo el menú de forma segura
+    const viewsToHide = ['dashboard', 'clients', 'barbers', 'services', 'reports', 'settings'];
+    viewsToHide.forEach(v => {
+      const btn = $("[data-view='" + v + "']");
+      if (btn) btn.style.display = "none";
+    });
+    
+    $$(".nav-label").forEach(label => label.style.display = "none");
+    if (quickPanel) quickPanel.style.display = "none";
+    
+    // Cambiar el texto del botón Agenda
+    const agendaBtn = $("[data-view='agenda']");
+    if (agendaBtn) agendaBtn.innerHTML = `<span class="nav-icon">&#9719;</span>Mis Citas`;
+  } 
+  else if (role === 'barbero') {
+    // Modo Barbero: Ocultar reportes globales y ajustes de negocio
+    const settingsBtn = $("[data-view='settings']");
+    if (settingsBtn) settingsBtn.style.display = "none";
+    
+    const reportsBtn = $("[data-view='reports']");
+    if (reportsBtn) reportsBtn.style.display = "none";
+  }
+}
+
+// 4. Cerrar sesión
+function logout() {
+  localStorage.removeItem("barberly_user");
+  currentUser = null;
+  appShell.style.display = "none";
+  loginScreen.style.display = "flex";
+  loginForm.reset();
+}
+
+// ====================================================
+// EVENTOS PRINCIPALES
+// ====================================================
+
+// Enviar el formulario de Login
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = loginForm.email.value.toLowerCase();
+  
+  // Simulación temporal hasta conectar el POST a PHP
+  let fakeUser = null;
+  if (email.includes("admin")) {
+    fakeUser = { id_usuario: 1, nombre: "Lucia Admin", rol: "admin", email };
+  } else if (email.includes("barbero")) {
+    fakeUser = { id_usuario: 2, nombre: "Marco Ruiz", rol: "barbero", email };
+  } else {
+    fakeUser = { id_usuario: 3, nombre: "Alejandro Torres", rol: "cliente", email };
+  }
+
+  // Guardar en el navegador para no pedir login al recargar
+  currentUser = fakeUser;
+  localStorage.setItem("barberly_user", JSON.stringify(currentUser));
+  
+  showAppShell();
+  notify(`Bienvenido/a, ${currentUser.nombre}`);
+});
+
+// Botón de cerrar sesión (Detecta clic en el menú lateral o en el header)
+$("#btn-logout")?.addEventListener("click", () => {
+  if (confirm("¿Seguro que quieres cerrar sesión?")) {
+    logout();
+  }
+});
+
+// (Mantén aquí el resto de tus eventos: modal, buscador, etc.)
+$$(".nav-item").forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
+$$("[data-view-link]").forEach((item) => item.addEventListener("click", () => showView(item.dataset.viewLink)));
+
+// ... (Resto de tus addEventListeners del modal que ya tenías) ...
+
+// ====================================================
+// INICIO AUTOMÁTICO
+// ====================================================
+renderAppointments();
+renderClients();
+renderBarbers();
+renderServices();
+loadData();
+
+// Arrancar comprobando la sesión
+checkAuth();

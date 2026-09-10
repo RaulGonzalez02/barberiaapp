@@ -15,7 +15,39 @@
 </head>
 
 <body>
-  <div class="app-shell">
+  <!-- ========================================== -->
+  <!-- PANTALLA DE LOGIN -->
+  <!-- ========================================== -->
+  <div class="login-screen" id="login-screen">
+    <div class="login-card">
+      <div class="brand" style="justify-content: center; margin-bottom: 25px;">
+        <div class="brand-mark">B</div>
+        <span>barberly</span>
+      </div>
+      <h2 class="login-title">Iniciar Sesión</h2>
+
+      <form id="login-form">
+        <label class="login-label">Email
+          <input type="email" name="email" class="login-input" placeholder="tu@email.com" required
+            autocomplete="email" />
+        </label>
+
+        <label class="login-label">Contraseña
+          <input type="password" name="password" class="login-input" placeholder="••••••••" required
+            autocomplete="current-password" />
+        </label>
+
+        <button type="submit" class="primary-button login-submit">Entrar a mi cuenta</button>
+      </form>
+
+      <p class="login-footer">¿Eres cliente y no tienes cuenta? <a href="#">Regístrate aquí</a></p>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- LA APP PRINCIPAL (Oculta por defecto) -->
+  <!-- ========================================== -->
+  <div class="app-shell" id="app-shell" style="display: none;">
     <aside class="sidebar" aria-label="Navegacion principal">
       <div class="brand">
         <div class="brand-mark">B</div>
@@ -24,7 +56,6 @@
       <div class="shop-switcher">
         <div class="shop-avatar">M</div>
         <div><strong>Modo Barber Club</strong><small>Madrid &middot; Centro</small></div>
-        <span class="chevron">&#8964;</span>
       </div>
       <nav class="main-nav">
         <p class="nav-label">Gestion</p>
@@ -39,17 +70,10 @@
         <button class="nav-item" data-view="settings"><span class="nav-icon">&#9881;</span>Configuracion</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="upgrade-card">
-          <div class="sparkle">&#10022;</div>
-          <strong>Tu periodo de prueba</strong>
-          <p>Te quedan 12 dias para disfrutar de todas las funciones.</p>
-          <button>Ver planes <span>&rarr;</span></button>
-        </div>
-        <div class="user-card">
-          <div class="user-avatar">LG</div>
-          <div><strong>Lucia Garcia</strong><small>Administradora</small></div>
-          <span class="more">&#8230;</span>
-        </div>
+        <button id="btn-logout" class="logout-button" title="Cerrar sesión">
+          <strong>Cerrar Sesión</strong>
+          <span class="logout-icon">&#10150;</span>
+        </button>
       </div>
     </aside>
 
@@ -59,7 +83,7 @@
         <div class="breadcrumb"><span>Inicio</span><span>/</span><strong id="page-title">Resumen</strong></div>
         <div class="top-actions">
           <button class="icon-button notification" aria-label="Notificaciones">&#9673;<i></i></button>
-          <div class="top-avatar">LG</div>
+          <div class="top-avatar" id="btn-top-avatar" style="cursor: pointer;">LG</div>
         </div>
       </header>
 
@@ -180,7 +204,7 @@
           </div>
           <div class="calendar-toolbar"><button class="outline-button">&larr; Anterior</button><strong>18 - 24
               septiembre 2024</strong><button class="outline-button">Siguiente &rarr;</button>
-            <div class="toolbar-spacer"></div><button class="filter-button">Todos los barberos &#8964;</button>
+            <div class="toolbar-spacer"></div><button class="filter-button">Todos los barberos </button>
           </div>
           <div class="panel full-panel">
             <div class="week-grid">

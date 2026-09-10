@@ -38,8 +38,9 @@ button {
 }
 
 .app-shell {
-    display: flex;
-    min-height: 100vh
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -249,8 +250,9 @@ button {
 }
 
 .main-content {
-    min-width: 0;
-    flex: 1
+  min-width: 0;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .topbar {
@@ -1382,4 +1384,130 @@ td {
 }
 .autocomplete-item small {
   color: var(--muted);
+}
+
+/* ==========================================
+   PANTALLA DE LOGIN
+   ========================================== */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow);
+}
+
+.login-title {
+  text-align: center;
+  font: 600 24px "Space Grotesk", sans-serif;
+  margin: 0 0 30px;
+  color: var(--ink);
+}
+
+.login-label {
+  display: block;
+  font-size: 11px;
+  color: #777b84;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+
+.login-input {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 14px;
+  margin-top: 8px;
+  outline: 0;
+  font-size: 14px;
+  background: #fdfdfd;
+  color: var(--ink);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.login-input:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 25px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.login-footer a {
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-footer a:hover {
+  text-decoration: underline;
+}
+
+.logout-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  transition: opacity 0.2s;
+}
+
+.logout-button {
+  display: flex;
+  flex-direction: row; /* Fuerza a que estén en la misma línea horizontal */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px; /* Padding mucho más pequeño */
+  background: #fff0e9;
+  border: 1px solid #fae4dc;
+  border-radius: 7px;
+  color: var(--accent-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-button strong {
+  font-size: 12px; /* Fuente más pequeña */
+  font-weight: 700;
+}
+
+.logout-button .logout-icon {
+  font-size: 15px; /* Icono más proporcionado al texto */
+  line-height: 1;
+  transform: scaleX(-1);
+}
+
+.logout-button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
