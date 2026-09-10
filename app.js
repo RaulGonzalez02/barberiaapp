@@ -29,7 +29,12 @@ const initials = (name) => name.split(" ").map((part) => part[0]).slice(0, 2).jo
 const money = (value) => `€ ${Number(String(value || 0).replace(",", ".")).toFixed(2).replace(".", ",")}`;
 
 async function apiGet(resource) {
-  const response = await fetch(`${API_URL}?resource=${resource}`);
+  const headers = {};
+  if (currentUser) {
+    headers['X-User-Id'] = currentUser.id_usuario;
+    headers['X-User-Role'] = currentUser.rol;
+  }
+  const response = await fetch(`${API_URL}?resource=${resource}`, { headers });
   if (!response.ok) throw new Error("API unavailable");
   return response.json();
 }
@@ -51,8 +56,13 @@ async function apiGetReviews(rating = "") {
 }
 
 async function apiPost(resource, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (currentUser) {
+    headers['X-User-Id'] = currentUser.id_usuario;
+    headers['X-User-Role'] = currentUser.rol;
+  }
   const response = await fetch(`${API_URL}?resource=${resource}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    method: "POST", headers, body: JSON.stringify(payload)
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "No se pudo guardar");
@@ -68,12 +78,29 @@ function renderAppointments(appointments = []) {
   ];
   $("#today-timeline").innerHTML = rows.map((item, index) => `
     <div class="appointment"><div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
+  const container = $("#today-timeline");
+  
+  if (!appointments || appointments.length === 0) {
+    container.innerHTML = `<p style="color: var(--muted); font-size: 12px; margin-top: 15px;">No hay turnos próximos.</p>`;
+    return;
+  }
+
+  container.innerHTML = appointments.map((item, index) => {
+    const title = item.cliente ? item.cliente : "Mi reserva";
+    
+    return `
+    <div class="appointment">
+      <div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
       <div class="appointment-card ${index % 3 === 1 ? "green-card" : index % 3 === 2 ? "purple-card" : ""}">
-        <div><strong>${item.cliente}</strong><small>${item.servicio} &middot; ${item.barbero}</small></div>
+        <div>
+          <strong>${title}</strong>
+          <small>${item.servicio || ''} &middot; ${item.barbero || ''}</small>
+        </div>
         <span class="appointment-status">${item.estado}</span>
         ${item.estado === "Completado" && item.id_turno ? `<button class="text-button review-appointment" data-review-turno="${item.id_turno}">Valorar</button>` : ""}
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function renderReviews(result = { data: [], summary: [] }) {
@@ -152,11 +179,120 @@ function renderServices() {
     <article class="service-card"><div class="service-icon">${["✂", "✦", "⌁", "★"][index % 4]}</div><h3>${service.nombre}</h3><p>${service.duracion} minutos de servicio.</p><span class="service-price">${money(service.precio)}</span></article>`).join("");
 }
 
+function renderModalContent(type) {
+  const form = $("#modal-form");
+  
+  if (type === "appointments") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="appointments">
+      
+      <label>Cliente
+        <div class="autocomplete-wrapper">
+          <input type="text" id="client-search-input" placeholder="Escribe el nombre o teléfono..." autocomplete="off" required />
+          <input type="hidden" name="id_cliente" id="appointment-client-id" />
+          <div id="client-dropdown" class="autocomplete-dropdown"></div>
+        </div>
+      </label>
+      
+      <label>Servicio<select name="id_servicio" id="appointment-service" required></select></label>
+      <div class="form-row">
+        <label>Fecha<input required type="date" name="date" value="${new Date().toISOString().slice(0, 10)}" /></label>
+        <label>Hora<input required type="time" name="time" value="15:00" /></label>
+      </div>
+      <label>Barbero<select name="id_barbero" id="appointment-barber" required></select></label>
+      <button class="primary-button modal-submit" type="submit">Crear turno</button>
+    `;
+    populateAppointmentForm();
+    setupClientAutocomplete(); // Inicializa el buscador interactivo
+  } 
+  else if (type === "barbers") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="barbers">
+      <label>Nombre completo<input required name="nombre" placeholder="Ej. Juan Pérez" autocomplete="off" /></label>
+      <label>Especialidad<input name="especialidad" placeholder="Ej. Fade y perfilado" autocomplete="off" /></label>
+      <button class="primary-button modal-submit" type="submit">Guardar barbero</button>
+    `;
+  }
+  else if (type === "clients") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="clients">
+      <label>Nombre completo<input required name="nombre" placeholder="Ej. Alejandro Torres" autocomplete="off" /></label>
+      <label>Teléfono<input required name="telefono" placeholder="Ej. +34 600 000 000" autocomplete="off" /></label>
+      <label>Notas (opcional)<input name="notas" placeholder="Preferencias del cliente..." autocomplete="off" /></label>
+      <button class="primary-button modal-submit" type="submit">Guardar cliente</button>
+    `;
+  }
+  else if (type === "services") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="services">
+      <label>Nombre del Servicio<input required name="nombre" placeholder="Ej. Corte Clásico" autocomplete="off" /></label>
+      <div class="form-row">
+        <label>Duración (minutos)<input required type="number" name="duracion" value="30" min="5" step="5" /></label>
+        <label>Precio (€)<input required type="number" name="precio" value="15.00" min="0" step="0.50" /></label>
+      </div>
+      <button class="primary-button modal-submit" type="submit">Guardar servicio</button>
+    `;
+  }
+}
+
+// Ya no metemos a los clientes en un select, solo barberos y servicios
 function populateAppointmentForm() {
-  $("#appointment-client").innerHTML = `<option value="">Selecciona un cliente</option>${clients.map((client) => `<option value="${client.id_cliente}">${client.nombre}</option>`).join("")}`;
-  $("#appointment-barber").innerHTML = `<option value="">Selecciona un barbero</option>${barbers.map((barber) => `<option value="${barber.id_barbero}">${barber.nombre}</option>`).join("")}`;
-  $("#appointment-service").innerHTML = `<option value="">Selecciona un servicio</option>${services.map((service) => `<option value="${service.id_servicio}">${service.nombre} - ${money(service.precio)}</option>`).join("")}`;
-  $("#modal-form input[type=date]").value = new Date().toISOString().slice(0, 10);
+  const barberSelect = $("#appointment-barber");
+  if(barberSelect) barberSelect.innerHTML = `<option value="">Selecciona un barbero</option>${barbers.map((barber) => `<option value="${barber.id_barbero}">${barber.nombre}</option>`).join("")}`;
+  
+  const serviceSelect = $("#appointment-service");
+  if(serviceSelect) serviceSelect.innerHTML = `<option value="">Selecciona un servicio</option>${services.map((service) => `<option value="${service.id_servicio}">${service.nombre} - ${money(service.precio)}</option>`).join("")}`;
+}
+
+// NUEVA FUNCIÓN: Lógica del autocompletado
+function setupClientAutocomplete() {
+  const searchInput = $("#client-search-input");
+  const hiddenInput = $("#appointment-client-id");
+  const dropdown = $("#client-dropdown");
+
+  searchInput.addEventListener("input", (e) => {
+    const term = e.target.value.toLowerCase().trim();
+    dropdown.innerHTML = ""; 
+    hiddenInput.value = ""; // Resetea el ID si el usuario empieza a escribir otra vez
+
+    if (!term) {
+      dropdown.style.display = "none";
+      return;
+    }
+
+    // Filtra por nombre o por teléfono
+    const matches = clients.filter(c => 
+      c.nombre.toLowerCase().includes(term) || 
+      (c.telefono && c.telefono.includes(term))
+    );
+
+    if (matches.length > 0) {
+      matches.forEach(client => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<strong>${client.nombre}</strong> <small>${client.telefono || ''}</small>`;
+        
+        // Al hacer click en un cliente de la lista...
+        div.addEventListener("click", () => {
+          searchInput.value = client.nombre;       // Rellena el input visible
+          hiddenInput.value = client.id_cliente;   // Guarda el ID real para la base de datos
+          dropdown.style.display = "none";         // Cierra la lista
+        });
+        dropdown.appendChild(div);
+      });
+    } else {
+      dropdown.innerHTML = `<div class="autocomplete-item"><small>No se encontraron clientes</small></div>`;
+    }
+    
+    dropdown.style.display = "block";
+  });
+
+  // Ocultar la lista si se hace clic fuera del buscador
+  document.addEventListener("click", (e) => {
+    if (e.target !== searchInput && e.target !== dropdown) {
+      dropdown.style.display = "none";
+    }
+  });
 }
 
 async function loadData() {
@@ -193,7 +329,20 @@ function showView(view) {
   $(".sidebar").classList.remove("open");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function openModal(title = "Nuevo turno") { $("#modal-title").textContent = title; $("#modal-backdrop").classList.add("open"); populateAppointmentForm(); $("#appointment-client").focus(); }
+
+// ----------------------------------------------------
+// NUEVO: openModal ahora recibe el 'type'
+// ----------------------------------------------------
+function openModal(type = "appointments", title = "Nuevo turno") { 
+  $("#modal-title").textContent = title; 
+  renderModalContent(type);
+  $("#modal-backdrop").classList.add("open"); 
+  
+  // Auto-foco en el primer input visible
+  const firstInput = $("#modal-form").querySelector("input:not([type=hidden]), select");
+  if(firstInput) firstInput.focus();
+}
+
 function closeModal() { $("#modal-backdrop").classList.remove("open"); }
 function notify(message) { $("#toast-text").textContent = message; $("#toast").classList.add("visible"); setTimeout(() => $("#toast").classList.remove("visible"), 3000); }
 
@@ -216,19 +365,76 @@ $("#today-timeline").addEventListener("click", (event) => {
   const button = event.target.closest("[data-review-turno]");
   if (button) openReviewModal(button.dataset.reviewTurno);
 });
+
+// ----------------------------------------------------
+// NUEVO: Conectar botones con sus respectivos modals
+// ----------------------------------------------------
+$("#new-appointment").addEventListener("click", () => openModal("appointments", "Nuevo turno"));
+$("#agenda-new").addEventListener("click", () => openModal("appointments", "Nuevo turno"));
+$("#clients-new").addEventListener("click", () => openModal("clients", "Nuevo cliente"));
+$("#quick-client").addEventListener("click", () => openModal("clients", "Nuevo cliente"));
+$("#quick-service").addEventListener("click", () => openModal("services", "Nuevo servicio"));
+$("#barbers-view .primary-button").addEventListener("click", () => openModal("barbers", "Añadir barbero"));
+$("#services-view .primary-button").addEventListener("click", () => openModal("services", "Nuevo servicio"));
+
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-backdrop").addEventListener("click", (event) => { if (event.target === $("#modal-backdrop")) closeModal(); });
+
+// ----------------------------------------------------
+// NUEVO: Procesamiento dinámico del form (submit)
+// ----------------------------------------------------
+// ----------------------------------------------------
+// NUEVO: Procesamiento dinámico del form (submit)
+// ----------------------------------------------------
 $("#modal-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  const actionType = form.get("action_type"); // Sabe si está guardando un turno, barbero, etc.
+
   try {
-    await apiPost("appointments", {
-      id_cliente: form.get("id_cliente"), id_barbero: form.get("id_barbero"), id_servicio: form.get("id_servicio"),
-      fecha_hora: `${form.get("date")} ${form.get("time")}:00`
-    });
-    closeModal(); notify("Turno guardado en la base de datos."); await loadData();
-  } catch (error) { notify(error.message); }
+    let payload = {};
+    
+    // Construimos los datos según el formulario que esté abierto
+    if (actionType === "appointments") {
+      const idCliente = form.get("id_cliente");
+      if (!idCliente) {
+        notify("Por favor, selecciona un cliente válido de la lista.");
+        return; 
+      }
+      payload = {
+        id_cliente: idCliente, 
+        id_barbero: form.get("id_barbero"), 
+        id_servicio: form.get("id_servicio"),
+        fecha_hora: `${form.get("date")} ${form.get("time")}:00`
+      };
+    } 
+    else if (actionType === "barbers") {
+      payload = { nombre: form.get("nombre"), especialidad: form.get("especialidad") };
+    } 
+    else if (actionType === "clients") {
+      payload = { nombre: form.get("nombre"), telefono: form.get("telefono"), notas: form.get("notas") };
+    } 
+    else if (actionType === "services") {
+      payload = { nombre: form.get("nombre"), duracion: form.get("duracion"), precio: form.get("precio") };
+    }
+
+    await apiPost(actionType, payload);
+    closeModal(); 
+    
+    const successMessages = {
+      appointments: "Turno guardado",
+      barbers: "Barbero añadido",
+      clients: "Cliente añadido",
+      services: "Servicio añadido"
+    };
+    notify(`${successMessages[actionType]} correctamente.`); 
+    
+    await loadData(); // Refresca las vistas
+  } catch (error) { 
+    notify(error.message); 
+  }
 });
+
 $("#client-search").addEventListener("input", (event) => {
   const term = event.target.value.toLowerCase();
   renderClients(clients.filter((client) => `${client.nombre} ${client.telefono || ""}`.toLowerCase().includes(term)));
@@ -266,3 +472,147 @@ renderBarbers();
 renderServices();
 renderReviews();
 loadData();
+
+// ====================================================
+// AUTENTICACIÓN Y ROLES (Login, Permisos, Logout)
+// ====================================================
+
+let currentUser = null;
+const loginScreen = $("#login-screen");
+const appShell = $("#app-shell");
+const loginForm = $("#login-form");
+
+// 1. Inicializar la app: comprobar si ya hay sesión guardada
+function checkAuth() {
+  const storedUser = localStorage.getItem("barberly_user");
+  if (storedUser) {
+    currentUser = JSON.parse(storedUser);
+    showAppShell();
+  } else {
+    loginScreen.style.display = "flex";
+    appShell.style.display = "none";
+  }
+}
+
+// 2. Mostrar la interfaz principal y aplicar restricciones
+function showAppShell() {
+  loginScreen.style.display = "none";
+  appShell.style.display = "flex";
+  
+  applyRolePermissions();
+  
+  // Redirigir según el rol
+  if (currentUser.rol === 'cliente') {
+    showView('agenda'); // El cliente no tiene dashboard, va directo a sus citas
+  } else {
+    showView('dashboard');
+  }
+}
+
+// 3. Modificar el DOM (menú) según quién entra
+function applyRolePermissions() {
+  const role = currentUser.rol;
+  
+  // 1. Actualizar avatares (Protegido por si los elementos no existen en el HTML)
+  const userAvatar = $(".user-avatar");
+  if (userAvatar) userAvatar.textContent = initials(currentUser.nombre);
+  
+  const userStrong = $(".user-card strong");
+  if (userStrong) userStrong.textContent = currentUser.nombre;
+  
+  const userSmall = $(".user-card small");
+  if (userSmall) userSmall.textContent = role === 'admin' ? 'Administrador' : (role === 'barbero' ? 'Barbero' : 'Cliente');
+
+  // 2. Restablecer visibilidad de todos los botones por si hubo un cambio de cuenta
+  $$(".nav-item").forEach(btn => btn.style.display = "flex");
+  $$(".nav-label").forEach(label => label.style.display = "block");
+  const quickPanel = $(".quick-panel");
+  if (quickPanel) quickPanel.style.display = "block";
+
+  // 3. Aplicar restricciones según el rol
+  if (role === 'cliente') {
+    // Modo Cliente: Ocultar casi todo el menú de forma segura
+    const viewsToHide = ['dashboard', 'clients', 'barbers', 'services', 'reports', 'settings'];
+    viewsToHide.forEach(v => {
+      const btn = $("[data-view='" + v + "']");
+      if (btn) btn.style.display = "none";
+    });
+    
+    $$(".nav-label").forEach(label => label.style.display = "none");
+    if (quickPanel) quickPanel.style.display = "none";
+    
+    // Cambiar el texto del botón Agenda
+    const agendaBtn = $("[data-view='agenda']");
+    if (agendaBtn) agendaBtn.innerHTML = `<span class="nav-icon">&#9719;</span>Mis Citas`;
+  } 
+  else if (role === 'barbero') {
+    // Modo Barbero: Ocultar reportes globales y ajustes de negocio
+    const settingsBtn = $("[data-view='settings']");
+    if (settingsBtn) settingsBtn.style.display = "none";
+    
+    const reportsBtn = $("[data-view='reports']");
+    if (reportsBtn) reportsBtn.style.display = "none";
+  }
+}
+
+// 4. Cerrar sesión
+function logout() {
+  localStorage.removeItem("barberly_user");
+  currentUser = null;
+  appShell.style.display = "none";
+  loginScreen.style.display = "flex";
+  loginForm.reset();
+}
+
+// ====================================================
+// EVENTOS PRINCIPALES
+// ====================================================
+
+// Enviar el formulario de Login
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  
+  const email = loginForm.email.value.trim();
+  const password = loginForm.password.value;
+  
+  try {
+    // 1. Llamada real al backend enviando credenciales
+    const user = await apiPost("login", { email, password });
+    
+    // 2. Si es exitoso, guardar los datos devueltos por PHP
+    currentUser = user;
+    localStorage.setItem("barberly_user", JSON.stringify(currentUser));
+    
+    showAppShell();
+    notify(`Bienvenido/a, ${currentUser.nombre}`);
+    
+  } catch (error) {
+    // Mostrará "Credenciales incorrectas" en el toast si falla
+    notify(error.message); 
+  }
+});
+
+// Botón de cerrar sesión (Detecta clic en el menú lateral o en el header)
+$("#btn-logout")?.addEventListener("click", () => {
+  if (confirm("¿Seguro que quieres cerrar sesión?")) {
+    logout();
+  }
+});
+
+// (Mantén aquí el resto de tus eventos: modal, buscador, etc.)
+$$(".nav-item").forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
+$$("[data-view-link]").forEach((item) => item.addEventListener("click", () => showView(item.dataset.viewLink)));
+
+// ... (Resto de tus addEventListeners del modal que ya tenías) ...
+
+// ====================================================
+// INICIO AUTOMÁTICO
+// ====================================================
+renderAppointments();
+renderClients();
+renderBarbers();
+renderServices();
+loadData();
+
+// Arrancar comprobando la sesión
+checkAuth();
