@@ -335,7 +335,7 @@ if ($resource === 'appointments') {
                     'error' => 'Este turno ya tiene una reseña'
                 ], 409);
             }
-            $stmt = $pdo->prepare(
+$stmt = $pdo->prepare(
                 "INSERT INTO resenas (id_turno, id_cliente, id_barbero, puntuacion, comentario)
                  VALUES (?, ?, ?, ?, ?)"
             );
@@ -346,7 +346,10 @@ if ($resource === 'appointments') {
                 $rating,
                 trim((string) ($data['comentario'] ?? '')) ?: null,
             ]);
+            
             respond(['id_resena' => (int) $pdo->lastInsertId()], 201);
+        } // <--- ESTA ES LA LLAVE QUE FALTA
+
         if ($resource === 'login') {
             if (empty($data['email']) || empty($data['password'])) {
                 respond(['error' => 'Email y contraseña son obligatorios'], 422);

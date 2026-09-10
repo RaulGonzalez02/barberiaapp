@@ -71,13 +71,6 @@ async function apiPost(resource, payload) {
 
 function renderAppointments(appointments = []) {
   window.completedAppointments = appointments.filter((item) => item.estado === "Completado" && item.id_turno);
-  const rows = appointments.length ? appointments : [
-    { hora: "09:00", cliente: "Alejandro Torres", servicio: "Corte clasico", barbero: "Marco Ruiz", estado: "Pendiente" },
-    { hora: "10:30", cliente: "Pablo Sanchez", servicio: "Fade + barba", barbero: "Sofia Martin", estado: "Completado" },
-    { hora: "12:00", cliente: "Javier Moreno", servicio: "Arreglo de barba", barbero: "Diego Navarro", estado: "Pendiente" }
-  ];
-  $("#today-timeline").innerHTML = rows.map((item, index) => `
-    <div class="appointment"><div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
   const container = $("#today-timeline");
   
   if (!appointments || appointments.length === 0) {
@@ -348,11 +341,6 @@ function notify(message) { $("#toast-text").textContent = message; $("#toast").c
 
 $$(".nav-item").forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
 $$("[data-view-link]").forEach((item) => item.addEventListener("click", () => showView(item.dataset.viewLink)));
-$("#new-appointment").addEventListener("click", () => openModal());
-$("#agenda-new").addEventListener("click", () => openModal());
-$("#clients-new").addEventListener("click", () => openModal("Nuevo cliente"));
-$("#quick-client").addEventListener("click", () => openModal("Nuevo cliente"));
-$("#quick-service").addEventListener("click", () => openModal("Nuevo servicio"));
 $("#new-review").addEventListener("click", () => openReviewModal());
 $("#review-modal-close").addEventListener("click", () => $("#review-modal-backdrop").classList.remove("open"));
 $("#review-modal-backdrop").addEventListener("click", (event) => {
