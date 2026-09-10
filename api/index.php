@@ -95,19 +95,45 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = body();
-
-        if ($resource === 'appointments') {
+if ($resource === 'appointments') {
             foreach (['id_cliente', 'id_barbero', 'id_servicio', 'fecha_hora'] as $required) {
                 if (empty($data[$required])) {
                     respond(['error' => "Falta el campo {$required}"], 422);
                 }
             }
-            $price = $pdo->prepare("SELECT precio FROM servicios WHERE id_servicio = ? AND activo = 1");
-            $price->execute([(int) $data['id_servicio']]);
-            $service = $price->fetch();
+
+            // 1. Obtener datos del servicio solicitado
+            $stmtService = $pdo->prepare("SELECT duracion, precio FROM servicios WHERE id_servicio = ? AND activo = 1");
+            $stmtService->execute([(int) $data['id_servicio']]);
+            $service = $stmtService->fetch();
+            
             if (!$service) {
                 respond(['error' => 'El servicio no existe o está inactivo'], 422);
             }
+
+            // 2. Validar que el barbero no tenga otro turno en ese lapso de tiempo
+            $stmtConflict = $pdo->prepare("
+                SELECT id_turno FROM turnos 
+                WHERE id_barbero = ? 
+                AND estado != 'Cancelado'
+                AND (
+                    fecha_hora < DATE_ADD(?, INTERVAL ? MINUTE) AND 
+                    DATE_ADD(fecha_hora, INTERVAL (SELECT duracion FROM servicios WHERE servicios.id_servicio = turnos.id_servicio) MINUTE) > ?
+                )
+            ");
+            
+            $stmtConflict->execute([
+                (int) $data['id_barbero'],
+                $data['fecha_hora'],
+                $service['duracion'],
+                $data['fecha_hora']
+            ]);
+
+            if ($stmtConflict->fetch()) {
+                respond(['error' => 'El barbero ya tiene un turno reservado en ese horario'], 409);
+            }
+
+            // 3. Insertar si está libre
             $stmt = $pdo->prepare(
                 "INSERT INTO turnos (id_cliente, id_barbero, id_servicio, fecha_hora, precio_cobrado)
                  VALUES (?, ?, ?, ?, ?)"
@@ -117,8 +143,9 @@ try {
                 (int) $data['id_barbero'],
                 (int) $data['id_servicio'],
                 $data['fecha_hora'],
-                $service['precio'],
+                $service['precio']
             ]);
+            
             respond(['id_turno' => (int) $pdo->lastInsertId()], 201);
         }
 
@@ -159,6 +186,46 @@ try {
             );
             $stmt->execute([$data['clave'], (string) $data['valor'], $data['descripcion'] ?? null]);
             respond(['clave' => $data['clave']], 200);
+        }
+
+        if ($resource === 'login') {
+            if (empty($data['email']) || empty($data['password'])) {
+                respond(['error' => 'Email y contraseña son obligatorios'], 422);
+            }
+
+            $email = trim($data['email']);
+            $password = (string) $data['password'];
+
+            // 1. Buscar primero si es un Barbero / Administrador
+            $stmt = $pdo->prepare("SELECT id_barbero, nombre, password, rol FROM barberos WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            if ($user && password_verify($password, $user['password'])) {
+                respond([
+                    'id_usuario' => $user['id_barbero'],
+                    'nombre' => $user['nombre'],
+                    'rol' => $user['rol'],
+                    'email' => $email
+                ], 200);
+            }
+
+            // 2. Si no es empleado, buscar si es un Cliente
+            $stmt = $pdo->prepare("SELECT id_cliente, nombre, password FROM clientes WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $client = $stmt->fetch();
+
+            if ($client && password_verify($password, $client['password'])) {
+                respond([
+                    'id_usuario' => $client['id_cliente'],
+                    'nombre' => $client['nombre'],
+                    'rol' => 'cliente', // Forzamos el rol para el frontend
+                    'email' => $email
+                ], 200);
+            }
+
+            // 3. Si no existe o la contraseña no coincide
+            respond(['error' => 'Credenciales incorrectas'], 401);
         }
     }
 

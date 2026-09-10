@@ -26,14 +26,24 @@ const initials = (name) => name.split(" ").map((part) => part[0]).slice(0, 2).jo
 const money = (value) => `€ ${Number(String(value || 0).replace(",", ".")).toFixed(2).replace(".", ",")}`;
 
 async function apiGet(resource) {
-  const response = await fetch(`${API_URL}?resource=${resource}`);
+  const headers = {};
+  if (currentUser) {
+    headers['X-User-Id'] = currentUser.id_usuario;
+    headers['X-User-Role'] = currentUser.rol;
+  }
+  const response = await fetch(`${API_URL}?resource=${resource}`, { headers });
   if (!response.ok) throw new Error("API unavailable");
   return response.json();
 }
 
 async function apiPost(resource, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (currentUser) {
+    headers['X-User-Id'] = currentUser.id_usuario;
+    headers['X-User-Role'] = currentUser.rol;
+  }
   const response = await fetch(`${API_URL}?resource=${resource}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    method: "POST", headers, body: JSON.stringify(payload)
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "No se pudo guardar");
@@ -41,18 +51,28 @@ async function apiPost(resource, payload) {
 }
 
 function renderAppointments(appointments = []) {
-  const rows = appointments.length ? appointments : [
-    { hora: "09:00", cliente: "Alejandro Torres", servicio: "Corte clasico", barbero: "Marco Ruiz", estado: "Pendiente" },
-    { hora: "10:30", cliente: "Pablo Sanchez", servicio: "Fade + barba", barbero: "Sofia Martin", estado: "Completado" },
-    { hora: "12:00", cliente: "Javier Moreno", servicio: "Arreglo de barba", barbero: "Diego Navarro", estado: "Pendiente" }
-  ];
-  $("#today-timeline").innerHTML = rows.map((item, index) => `
-    <div class="appointment"><div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
+  const container = $("#today-timeline");
+  
+  if (!appointments || appointments.length === 0) {
+    container.innerHTML = `<p style="color: var(--muted); font-size: 12px; margin-top: 15px;">No hay turnos próximos.</p>`;
+    return;
+  }
+
+  container.innerHTML = appointments.map((item, index) => {
+    const title = item.cliente ? item.cliente : "Mi reserva";
+    
+    return `
+    <div class="appointment">
+      <div class="appointment-time">${item.hora}</div><span class="appointment-dot"></span>
       <div class="appointment-card ${index % 3 === 1 ? "green-card" : index % 3 === 2 ? "purple-card" : ""}">
-        <div><strong>${item.cliente}</strong><small>${item.servicio} &middot; ${item.barbero}</small></div>
+        <div>
+          <strong>${title}</strong>
+          <small>${item.servicio || ''} &middot; ${item.barbero || ''}</small>
+        </div>
         <span class="appointment-status">${item.estado}</span>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function clientRow(client, detailed = false) {
@@ -423,24 +443,25 @@ function logout() {
 // Enviar el formulario de Login
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const email = loginForm.email.value.toLowerCase();
   
-  // Simulación temporal hasta conectar el POST a PHP
-  let fakeUser = null;
-  if (email.includes("admin")) {
-    fakeUser = { id_usuario: 1, nombre: "Lucia Admin", rol: "admin", email };
-  } else if (email.includes("barbero")) {
-    fakeUser = { id_usuario: 2, nombre: "Marco Ruiz", rol: "barbero", email };
-  } else {
-    fakeUser = { id_usuario: 3, nombre: "Alejandro Torres", rol: "cliente", email };
+  const email = loginForm.email.value.trim();
+  const password = loginForm.password.value;
+  
+  try {
+    // 1. Llamada real al backend enviando credenciales
+    const user = await apiPost("login", { email, password });
+    
+    // 2. Si es exitoso, guardar los datos devueltos por PHP
+    currentUser = user;
+    localStorage.setItem("barberly_user", JSON.stringify(currentUser));
+    
+    showAppShell();
+    notify(`Bienvenido/a, ${currentUser.nombre}`);
+    
+  } catch (error) {
+    // Mostrará "Credenciales incorrectas" en el toast si falla
+    notify(error.message); 
   }
-
-  // Guardar en el navegador para no pedir login al recargar
-  currentUser = fakeUser;
-  localStorage.setItem("barberly_user", JSON.stringify(currentUser));
-  
-  showAppShell();
-  notify(`Bienvenido/a, ${currentUser.nombre}`);
 });
 
 // Botón de cerrar sesión (Detecta clic en el menú lateral o en el header)
