@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f7f8fa" />
+  <title>Barberly | Gestion para barberias</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegacion principal">
+      <div class="brand">
+        <div class="brand-mark">B</div>
+        <span>barberly</span>
+      </div>
+      <div class="shop-switcher">
+        <div class="shop-avatar">M</div>
+        <div><strong>Modo Barber Club</strong><small>Madrid &middot; Centro</small></div>
+        <span class="chevron">&#8964;</span>
+      </div>
+      <nav class="main-nav">
+        <p class="nav-label">Gestion</p>
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">&#9632;</span>Resumen</button>
+        <button class="nav-item" data-view="agenda"><span class="nav-icon">&#9719;</span>Agenda <b
+            class="nav-badge">4</b></button>
+        <button class="nav-item" data-view="clients"><span class="nav-icon">&#9673;</span>Clientes</button>
+        <button class="nav-item" data-view="barbers"><span class="nav-icon">&#9737;</span>Barberos</button>
+        <button class="nav-item" data-view="services"><span class="nav-icon">&#10024;</span>Servicios</button>
+        <p class="nav-label nav-label-spaced">Cuenta</p>
+        <button class="nav-item" data-view="reports"><span class="nav-icon">&#9648;</span>Reportes</button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">&#9881;</span>Configuracion</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="upgrade-card">
+          <div class="sparkle">&#10022;</div>
+          <strong>Tu periodo de prueba</strong>
+          <p>Te quedan 12 dias para disfrutar de todas las funciones.</p>
+          <button>Ver planes <span>&rarr;</span></button>
+        </div>
+        <div class="user-card">
+          <div class="user-avatar">LG</div>
+          <div><strong>Lucia Garcia</strong><small>Administradora</small></div>
+          <span class="more">&#8230;</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu" aria-label="Abrir menu">&#9776;</button>
+        <div class="breadcrumb"><span>Inicio</span><span>/</span><strong id="page-title">Resumen</strong></div>
+        <div class="top-actions">
+          <button class="icon-button notification" aria-label="Notificaciones">&#9673;<i></i></button>
+          <div class="top-avatar">LG</div>
+        </div>
+      </header>
+
+      <div class="page-container">
+        <section class="view active-view" id="dashboard-view">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">MIERCOLES, 18 DE SEPTIEMBRE DE 2024</p>
+              <h1>Buenos dias, Lucia <span class="wave">&#128075;</span></h1>
+              <p class="heading-subtitle">Esto es lo que esta pasando hoy en tu barberia.</p>
+            </div>
+            <button class="primary-button" id="new-appointment"><span>+</span> Nuevo turno</button>
+          </div>
+          <div class="stats-grid">
+            <article class="stat-card">
+              <div class="stat-top"><span>Turnos de hoy</span><span class="stat-icon orange">&#9719;</span></div>
+              <div class="stat-value">24</div>
+              <div class="stat-foot positive"><span>&#8593; 12.5%</span> vs. ayer</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-top"><span>Ingresos del dia</span><span class="stat-icon green">&#8364;</span></div>
+              <div class="stat-value">&euro; 486,00</div>
+              <div class="stat-foot positive"><span>&#8593; 8.2%</span> vs. ayer</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-top"><span>Nuevos clientes</span><span class="stat-icon purple">&#10024;</span></div>
+              <div class="stat-value">8</div>
+              <div class="stat-foot positive"><span>&#8593; 33.3%</span> esta semana</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-top"><span>Ocupacion</span><span class="stat-icon blue">&#9783;</span></div>
+              <div class="stat-value">78<span class="unit">%</span></div>
+              <div class="stat-foot neutral"><span>+4.5%</span> vs. semana pasada</div>
+            </article>
+          </div>
+          <div class="content-grid">
+            <article class="panel agenda-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Agenda de hoy</h2>
+                  <p>18 de septiembre &middot; 24 turnos</p>
+                </div><button class="text-button" data-view-link="agenda">Ver agenda completa &rarr;</button>
+              </div>
+              <div class="timeline" id="today-timeline"></div>
+            </article>
+            <div class="side-column">
+              <article class="panel staff-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Equipo</h2>
+                    <p>Estado en tiempo real</p>
+                  </div><button class="dots">&#8230;</button>
+                </div>
+                <div class="staff-list">
+                  <div class="staff-row">
+                    <div class="person-avatar photo-1">MR</div>
+                    <div class="person-info"><strong>Marco Ruiz</strong><small><i
+                          class="status-dot online"></i>Atendiendo a un cliente</small></div><span
+                      class="staff-count">8</span>
+                  </div>
+                  <div class="staff-row">
+                    <div class="person-avatar photo-2">SM</div>
+                    <div class="person-info"><strong>Sofia Martin</strong><small><i
+                          class="status-dot online"></i>Disponible</small></div><span class="staff-count">7</span>
+                  </div>
+                  <div class="staff-row">
+                    <div class="person-avatar photo-3">DN</div>
+                    <div class="person-info"><strong>Diego Navarro</strong><small><i class="status-dot away"></i>En
+                        descanso</small></div><span class="staff-count">6</span>
+                  </div>
+                </div><button class="outline-button" data-view-link="barbers">Gestionar equipo</button>
+              </article>
+              <article class="panel quick-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Acciones rapidas</h2>
+                  </div>
+                </div>
+                <div class="quick-actions"><button id="quick-client"><span
+                      class="quick-icon peach">&#9673;</span><span><strong>Añadir cliente</strong><small>Registra un
+                        nuevo cliente</small></span><b>&rarr;</b></button><button id="quick-service"><span
+                      class="quick-icon lilac">&#10024;</span><span><strong>Nuevo servicio</strong><small>Crea una nueva
+                        oferta</small></span><b>&rarr;</b></button></div>
+              </article>
+            </div>
+          </div>
+          <article class="panel clients-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Clientes recientes</h2>
+                <p>Los ultimos clientes registrados</p>
+              </div><button class="text-button" data-view-link="clients">Ver todos &rarr;</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>CLIENTE</th>
+                    <th>ULTIMO SERVICIO</th>
+                    <th>BARBERO</th>
+                    <th>ULTIMA VISITA</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="recent-clients"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" id="agenda-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">GESTION DE TURNOS</p>
+              <h1>Agenda</h1>
+              <p class="heading-subtitle">Organiza el dia de tu equipo de un vistazo.</p>
+            </div><button class="primary-button" id="agenda-new"><span>+</span> Nuevo turno</button>
+          </div>
+          <div class="calendar-toolbar"><button class="outline-button">&larr; Anterior</button><strong>18 - 24
+              septiembre 2024</strong><button class="outline-button">Siguiente &rarr;</button>
+            <div class="toolbar-spacer"></div><button class="filter-button">Todos los barberos &#8964;</button>
+          </div>
+          <div class="panel full-panel">
+            <div class="week-grid">
+              <div></div>
+              <div>LUN<span>16</span></div>
+              <div>MAR<span>17</span></div>
+              <div class="today-col">MIE<span>18</span></div>
+              <div>JUE<span>19</span></div>
+              <div>VIE<span>20</span></div>
+              <div>SAB<span>21</span></div>
+              <div>DOM<span>22</span></div>
+              <div class="time-label">09:00</div>
+              <div></div>
+              <div></div>
+              <div class="calendar-event green-event">Corte clasico<small>Marco &middot; 09:00</small></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div class="time-label">10:00</div>
+              <div></div>
+              <div class="calendar-event orange-event">Fade + barba<small>Sofia &middot; 10:00</small></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div class="time-label">11:00</div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div class="calendar-event purple-event">Corte infantil<small>Diego &middot; 11:00</small></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div class="time-label">12:00</div>
+            </div>
+          </div>
+        </section>
+        <section class="view" id="clients-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">RELACION CON CLIENTES</p>
+              <h1>Clientes</h1>
+              <p class="heading-subtitle">Conoce y cuida a tu comunidad.</p>
+            </div><button class="primary-button" id="clients-new"><span>+</span> Nuevo cliente</button>
+          </div>
+          <div class="panel full-panel">
+            <div class="list-toolbar">
+              <div class="search-box">&#8981;<input id="client-search" placeholder="Buscar cliente..." /></div><button
+                class="filter-button">Filtros &#9881;</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>CLIENTE</th>
+                    <th>TELEFONO</th>
+                    <th>ULTIMO SERVICIO</th>
+                    <th>VISITAS</th>
+                    <th>GASTO TOTAL</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="clients-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section class="view" id="barbers-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">TU EQUIPO</p>
+              <h1>Barberos</h1>
+              <p class="heading-subtitle">Gestiona horarios, rendimiento y disponibilidad.</p>
+            </div><button class="primary-button"><span>+</span> Añadir barbero</button>
+          </div>
+          <div class="barber-cards" id="barber-cards"></div>
+        </section>
+        <section class="view" id="services-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">CATALOGO</p>
+              <h1>Servicios</h1>
+              <p class="heading-subtitle">Configura tu carta de servicios y precios.</p>
+            </div><button class="primary-button"><span>+</span> Nuevo servicio</button>
+          </div>
+          <div class="service-grid" id="service-grid"></div>
+        </section>
+        <section class="view" id="reports-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">RENDIMIENTO</p>
+              <h1>Reportes</h1>
+              <p class="heading-subtitle">Una vision clara para tomar mejores decisiones.</p>
+            </div><button class="outline-button">Exportar reporte &darr;</button>
+          </div>
+          <div class="report-placeholder"><span>&#9681;</span>
+            <h2>Tus reportes semanales</h2>
+            <p>Selecciona un periodo para analizar ingresos, ocupacion y servicios mas vendidos.</p><button
+              class="primary-button">Ver reporte</button>
+          </div>
+        </section>
+        <section class="view" id="settings-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">PREFERENCIAS</p>
+              <h1>Configuracion</h1>
+              <p class="heading-subtitle">Personaliza Barberly para tu negocio.</p>
+            </div>
+          </div>
+          <div class="settings-list panel"><button><span class="setting-icon">&#9881;</span><span><strong>Datos de la
+                  barberia</strong><small>Nombre, direccion y horarios</small></span><b>&rarr;</b></button><button><span
+                class="setting-icon">&#128276;</span><span><strong>Notificaciones</strong><small>Elige cuando quieres
+                  recibir avisos</small></span><b>&rarr;</b></button><button><span
+                class="setting-icon">&#8364;</span><span><strong>Facturacion</strong><small>Plan actual y metodos de
+                  pago</small></span><b>&rarr;</b></button></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close"
+        id="modal-close">&times;</button>
+      <p class="eyebrow">NUEVO REGISTRO</p>
+      <h2 id="modal-title">Nuevo turno</h2>
+      <form id="modal-form"><label>Cliente<select required name="id_cliente" id="appointment-client">
+            <option value="">Selecciona un cliente</option>
+          </select></label><label>Servicio<select required name="id_servicio" id="appointment-service">
+            <option value="">Selecciona un servicio</option>
+          </select></label>
+        <div class="form-row"><label>Fecha<input required type="date" name="date" /></label><label>Hora<input required
+              type="time" name="time" value="15:00" /></label></div><label>Barbero<select required name="id_barbero"
+            id="appointment-barber">
+            <option value="">Selecciona un barbero</option>
+          </select></label><button class="primary-button modal-submit" type="submit">Crear turno</button>
+      </form>
+    </div>
+  </div>
+  <div class="toast" id="toast"><span>&#10003;</span>
+    <div><strong>Listo</strong><small id="toast-text">El turno se ha creado correctamente.</small></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+
+</html>
