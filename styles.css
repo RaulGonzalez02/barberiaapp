@@ -1342,3 +1342,44 @@ td {
         gap: 12px
     }
 }
+
+/* Buscador de clientes autocompletado */
+.autocomplete-wrapper {
+  position: relative;
+}
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  margin-top: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 10px 25px rgba(20,25,40,0.15);
+  display: none; /* Oculto por defecto */
+}
+.autocomplete-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f1f3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+.autocomplete-item:hover {
+  background: #fdfaf9;
+}
+.autocomplete-item strong {
+  color: var(--ink);
+}
+.autocomplete-item small {
+  color: var(--muted);
+}

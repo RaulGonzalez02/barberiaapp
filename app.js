@@ -79,11 +79,120 @@ function renderServices() {
     <article class="service-card"><div class="service-icon">${["✂", "✦", "⌁", "★"][index % 4]}</div><h3>${service.nombre}</h3><p>${service.duracion} minutos de servicio.</p><span class="service-price">${money(service.precio)}</span></article>`).join("");
 }
 
+function renderModalContent(type) {
+  const form = $("#modal-form");
+  
+  if (type === "appointments") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="appointments">
+      
+      <label>Cliente
+        <div class="autocomplete-wrapper">
+          <input type="text" id="client-search-input" placeholder="Escribe el nombre o teléfono..." autocomplete="off" required />
+          <input type="hidden" name="id_cliente" id="appointment-client-id" />
+          <div id="client-dropdown" class="autocomplete-dropdown"></div>
+        </div>
+      </label>
+      
+      <label>Servicio<select name="id_servicio" id="appointment-service" required></select></label>
+      <div class="form-row">
+        <label>Fecha<input required type="date" name="date" value="${new Date().toISOString().slice(0, 10)}" /></label>
+        <label>Hora<input required type="time" name="time" value="15:00" /></label>
+      </div>
+      <label>Barbero<select name="id_barbero" id="appointment-barber" required></select></label>
+      <button class="primary-button modal-submit" type="submit">Crear turno</button>
+    `;
+    populateAppointmentForm();
+    setupClientAutocomplete(); // Inicializa el buscador interactivo
+  } 
+  else if (type === "barbers") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="barbers">
+      <label>Nombre completo<input required name="nombre" placeholder="Ej. Juan Pérez" autocomplete="off" /></label>
+      <label>Especialidad<input name="especialidad" placeholder="Ej. Fade y perfilado" autocomplete="off" /></label>
+      <button class="primary-button modal-submit" type="submit">Guardar barbero</button>
+    `;
+  }
+  else if (type === "clients") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="clients">
+      <label>Nombre completo<input required name="nombre" placeholder="Ej. Alejandro Torres" autocomplete="off" /></label>
+      <label>Teléfono<input required name="telefono" placeholder="Ej. +34 600 000 000" autocomplete="off" /></label>
+      <label>Notas (opcional)<input name="notas" placeholder="Preferencias del cliente..." autocomplete="off" /></label>
+      <button class="primary-button modal-submit" type="submit">Guardar cliente</button>
+    `;
+  }
+  else if (type === "services") {
+    form.innerHTML = `
+      <input type="hidden" name="action_type" value="services">
+      <label>Nombre del Servicio<input required name="nombre" placeholder="Ej. Corte Clásico" autocomplete="off" /></label>
+      <div class="form-row">
+        <label>Duración (minutos)<input required type="number" name="duracion" value="30" min="5" step="5" /></label>
+        <label>Precio (€)<input required type="number" name="precio" value="15.00" min="0" step="0.50" /></label>
+      </div>
+      <button class="primary-button modal-submit" type="submit">Guardar servicio</button>
+    `;
+  }
+}
+
+// Ya no metemos a los clientes en un select, solo barberos y servicios
 function populateAppointmentForm() {
-  $("#appointment-client").innerHTML = `<option value="">Selecciona un cliente</option>${clients.map((client) => `<option value="${client.id_cliente}">${client.nombre}</option>`).join("")}`;
-  $("#appointment-barber").innerHTML = `<option value="">Selecciona un barbero</option>${barbers.map((barber) => `<option value="${barber.id_barbero}">${barber.nombre}</option>`).join("")}`;
-  $("#appointment-service").innerHTML = `<option value="">Selecciona un servicio</option>${services.map((service) => `<option value="${service.id_servicio}">${service.nombre} - ${money(service.precio)}</option>`).join("")}`;
-  $("#modal-form input[type=date]").value = new Date().toISOString().slice(0, 10);
+  const barberSelect = $("#appointment-barber");
+  if(barberSelect) barberSelect.innerHTML = `<option value="">Selecciona un barbero</option>${barbers.map((barber) => `<option value="${barber.id_barbero}">${barber.nombre}</option>`).join("")}`;
+  
+  const serviceSelect = $("#appointment-service");
+  if(serviceSelect) serviceSelect.innerHTML = `<option value="">Selecciona un servicio</option>${services.map((service) => `<option value="${service.id_servicio}">${service.nombre} - ${money(service.precio)}</option>`).join("")}`;
+}
+
+// NUEVA FUNCIÓN: Lógica del autocompletado
+function setupClientAutocomplete() {
+  const searchInput = $("#client-search-input");
+  const hiddenInput = $("#appointment-client-id");
+  const dropdown = $("#client-dropdown");
+
+  searchInput.addEventListener("input", (e) => {
+    const term = e.target.value.toLowerCase().trim();
+    dropdown.innerHTML = ""; 
+    hiddenInput.value = ""; // Resetea el ID si el usuario empieza a escribir otra vez
+
+    if (!term) {
+      dropdown.style.display = "none";
+      return;
+    }
+
+    // Filtra por nombre o por teléfono
+    const matches = clients.filter(c => 
+      c.nombre.toLowerCase().includes(term) || 
+      (c.telefono && c.telefono.includes(term))
+    );
+
+    if (matches.length > 0) {
+      matches.forEach(client => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<strong>${client.nombre}</strong> <small>${client.telefono || ''}</small>`;
+        
+        // Al hacer click en un cliente de la lista...
+        div.addEventListener("click", () => {
+          searchInput.value = client.nombre;       // Rellena el input visible
+          hiddenInput.value = client.id_cliente;   // Guarda el ID real para la base de datos
+          dropdown.style.display = "none";         // Cierra la lista
+        });
+        dropdown.appendChild(div);
+      });
+    } else {
+      dropdown.innerHTML = `<div class="autocomplete-item"><small>No se encontraron clientes</small></div>`;
+    }
+    
+    dropdown.style.display = "block";
+  });
+
+  // Ocultar la lista si se hace clic fuera del buscador
+  document.addEventListener("click", (e) => {
+    if (e.target !== searchInput && e.target !== dropdown) {
+      dropdown.style.display = "none";
+    }
+  });
 }
 
 async function loadData() {
@@ -98,13 +207,11 @@ async function loadData() {
     renderClients();
     renderBarbers();
     renderServices();
-    populateAppointmentForm();
   } catch {
     renderAppointments();
     renderClients();
     renderBarbers();
     renderServices();
-    populateAppointmentForm();
     notify("Modo demo: inicia Apache y MySQL para conectar phpMyAdmin.");
   }
 }
@@ -117,30 +224,86 @@ function showView(view) {
   $(".sidebar").classList.remove("open");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function openModal(title = "Nuevo turno") { $("#modal-title").textContent = title; $("#modal-backdrop").classList.add("open"); populateAppointmentForm(); $("#appointment-client").focus(); }
+
+// ----------------------------------------------------
+// NUEVO: openModal ahora recibe el 'type'
+// ----------------------------------------------------
+function openModal(type = "appointments", title = "Nuevo turno") { 
+  $("#modal-title").textContent = title; 
+  renderModalContent(type);
+  $("#modal-backdrop").classList.add("open"); 
+  
+  // Auto-foco en el primer input visible
+  const firstInput = $("#modal-form").querySelector("input:not([type=hidden]), select");
+  if(firstInput) firstInput.focus();
+}
+
 function closeModal() { $("#modal-backdrop").classList.remove("open"); }
 function notify(message) { $("#toast-text").textContent = message; $("#toast").classList.add("visible"); setTimeout(() => $("#toast").classList.remove("visible"), 3000); }
 
 $$(".nav-item").forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
 $$("[data-view-link]").forEach((item) => item.addEventListener("click", () => showView(item.dataset.viewLink)));
-$("#new-appointment").addEventListener("click", () => openModal());
-$("#agenda-new").addEventListener("click", () => openModal());
-$("#clients-new").addEventListener("click", () => openModal("Nuevo cliente"));
-$("#quick-client").addEventListener("click", () => openModal("Nuevo cliente"));
-$("#quick-service").addEventListener("click", () => openModal("Nuevo servicio"));
+
+// ----------------------------------------------------
+// NUEVO: Conectar botones con sus respectivos modals
+// ----------------------------------------------------
+$("#new-appointment").addEventListener("click", () => openModal("appointments", "Nuevo turno"));
+$("#agenda-new").addEventListener("click", () => openModal("appointments", "Nuevo turno"));
+$("#clients-new").addEventListener("click", () => openModal("clients", "Nuevo cliente"));
+$("#quick-client").addEventListener("click", () => openModal("clients", "Nuevo cliente"));
+$("#quick-service").addEventListener("click", () => openModal("services", "Nuevo servicio"));
+$("#barbers-view .primary-button").addEventListener("click", () => openModal("barbers", "Añadir barbero"));
+$("#services-view .primary-button").addEventListener("click", () => openModal("services", "Nuevo servicio"));
+
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-backdrop").addEventListener("click", (event) => { if (event.target === $("#modal-backdrop")) closeModal(); });
+
+// ----------------------------------------------------
+// NUEVO: Procesamiento dinámico del form (submit)
+// ----------------------------------------------------
 $("#modal-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  const actionType = form.get("action_type"); // Sabe si está guardando un turno, barbero, etc.
+
   try {
-    await apiPost("appointments", {
-      id_cliente: form.get("id_cliente"), id_barbero: form.get("id_barbero"), id_servicio: form.get("id_servicio"),
-      fecha_hora: `${form.get("date")} ${form.get("time")}:00`
-    });
-    closeModal(); notify("Turno guardado en la base de datos."); await loadData();
-  } catch (error) { notify(error.message); }
+    let payload = {};
+    
+if (actionType === "appointments") {
+      const idCliente = form.get("id_cliente");
+      
+      // Añade esta comprobación:
+      if (!idCliente) {
+        notify("Por favor, selecciona un cliente válido de la lista.");
+        return; // Detiene el envío
+      }
+
+      payload = {
+        id_cliente: idCliente, 
+        id_barbero: form.get("id_barbero"), 
+        id_servicio: form.get("id_servicio"),
+        fecha_hora: `${form.get("date")} ${form.get("time")}:00`
+      };
+    }
+
+    await apiPost(actionType, payload);
+    closeModal(); 
+    
+    // Mensaje de éxito dinámico
+    const successMessages = {
+      appointments: "Turno guardado",
+      barbers: "Barbero añadido",
+      clients: "Cliente añadido",
+      services: "Servicio añadido"
+    };
+    notify(`${successMessages[actionType]} correctamente.`); 
+    
+    await loadData(); // Refresca las vistas con el nuevo dato
+  } catch (error) { 
+    notify(error.message); 
+  }
 });
+
 $("#client-search").addEventListener("input", (event) => {
   const term = event.target.value.toLowerCase();
   renderClients(clients.filter((client) => `${client.nombre} ${client.telefono || ""}`.toLowerCase().includes(term)));
