@@ -54,3 +54,34 @@ CREATE TABLE turnos (
     INDEX idx_turnos_fecha (fecha_hora),
     INDEX idx_turnos_estado (estado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE resenas (
+    id_resena INT AUTO_INCREMENT PRIMARY KEY,
+    id_turno INT NOT NULL UNIQUE,
+    id_cliente INT NOT NULL,
+    id_barbero INT NOT NULL,
+    puntuacion TINYINT UNSIGNED NOT NULL,
+    comentario VARCHAR(1000),
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_resena_puntuacion
+        CHECK (puntuacion BETWEEN 1 AND 10),
+
+    CONSTRAINT fk_resena_turno
+        FOREIGN KEY (id_turno)
+        REFERENCES turnos(id_turno)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_resena_cliente
+        FOREIGN KEY (id_cliente)
+        REFERENCES clientes(id_cliente)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_resena_barbero
+        FOREIGN KEY (id_barbero)
+        REFERENCES barberos(id_barbero)
+        ON DELETE CASCADE,
+
+    INDEX idx_resenas_barbero (id_barbero),
+    INDEX idx_resenas_cliente (id_cliente)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

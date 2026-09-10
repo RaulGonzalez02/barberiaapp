@@ -34,6 +34,7 @@
         <button class="nav-item" data-view="clients"><span class="nav-icon">&#9673;</span>Clientes</button>
         <button class="nav-item" data-view="barbers"><span class="nav-icon">&#9737;</span>Barberos</button>
         <button class="nav-item" data-view="services"><span class="nav-icon">&#10024;</span>Servicios</button>
+        <button class="nav-item" data-view="reviews"><span class="nav-icon">&#9733;</span>Reseñas</button>
         <p class="nav-label nav-label-spaced">Cuenta</p>
         <button class="nav-item" data-view="reports"><span class="nav-icon">&#9648;</span>Reportes</button>
         <button class="nav-item" data-view="settings"><span class="nav-icon">&#9881;</span>Configuracion</button>
@@ -270,6 +271,59 @@
           </div>
           <div class="service-grid" id="service-grid"></div>
         </section>
+        <section class="view" id="reviews-view">
+          <div class="page-heading compact-heading">
+            <div>
+              <p class="eyebrow">CALIDAD Y REPUTACION</p>
+              <h1>Reseñas</h1>
+              <p class="heading-subtitle">
+                Audita la experiencia y reconoce el trabajo de tu equipo.
+              </p>
+            </div>
+
+            <button class="primary-button" id="new-review">
+              <span>+</span> Nueva reseña
+            </button>
+          </div>
+
+          <div class="stats-grid" id="review-summary"></div>
+
+          <div class="panel full-panel">
+            <div class="list-toolbar">
+              <strong>Auditoría de reputación</strong>
+
+              <select id="review-rating-filter" class="filter-button">
+                <option value="">Todas las puntuaciones</option>
+                <option value="10">10 puntos</option>
+                <option value="9">9 puntos</option>
+                <option value="8">8 puntos</option>
+                <option value="7">7 puntos</option>
+                <option value="6">6 puntos</option>
+                <option value="5">5 puntos</option>
+                <option value="4">4 puntos</option>
+                <option value="3">3 puntos</option>
+                <option value="2">2 puntos</option>
+                <option value="1">1 punto</option>
+              </select>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>CLIENTE</th>
+                    <th>BARBERO</th>
+                    <th>SERVICIO</th>
+                    <th>NOTA</th>
+                    <th>RESEÑA</th>
+                    <th>FECHA</th>
+                  </tr>
+                </thead>
+                <tbody id="reviews-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
         <section class="view" id="reports-view">
           <div class="page-heading compact-heading">
             <div>
@@ -317,6 +371,46 @@
             id="appointment-barber">
             <option value="">Selecciona un barbero</option>
           </select></label><button class="primary-button modal-submit" type="submit">Crear turno</button>
+      </form>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="review-modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="review-modal-close">&times;</button>
+
+      <p class="eyebrow">POST-SERVICIO</p>
+      <h2>Valorar servicio</h2>
+
+      <form id="review-form">
+        <label>
+          Turno completado
+          <select required name="id_turno" id="review-appointment"></select>
+        </label>
+
+        <label>
+          Puntuación (1-10)
+          <input
+            required
+            type="number"
+            name="puntuacion"
+            min="1"
+            max="10"
+          />
+        </label>
+
+        <label>
+          Reseña
+          <textarea
+            name="comentario"
+            maxlength="1000"
+            rows="4"
+            placeholder="¿Cómo fue la experiencia?"
+          ></textarea>
+        </label>
+
+        <button class="primary-button modal-submit" type="submit">
+          Guardar reseña
+        </button>
       </form>
     </div>
   </div>
